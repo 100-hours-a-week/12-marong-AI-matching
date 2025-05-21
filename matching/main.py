@@ -1,6 +1,6 @@
 from db import SessionLocal
 from db_models import Users, Manittos, UserGroups
-from manitto_matcher import ManittoMatcher
+from matcher import ManittoMatcher
 from get_week_index import GetWeekIndex
 from datetime import datetime
 import json
@@ -13,18 +13,18 @@ current_week = GetWeekIndex(today, base_date).get()
 # DB 세션 열기
 session = SessionLocal()
 
-# ✅ user_id → group_id 매핑
+# user_id → group_id 매핑
 user_group_map = {
     row.user_id: row.group_id
     for row in session.query(UserGroups.user_id, UserGroups.group_id).all()
 }
 
-# ✅ group_id → user_id 목록 매핑
+# group_id → user_id 목록 매핑
 group_users = {}
 for user_id, group_id in user_group_map.items():
     group_users.setdefault(group_id, []).append(user_id)
 
-# ✅ 과거 매칭 정보
+# 과거 매칭 정보
 previous_matches = {}
 matches = session.query(Manittos.manittee_id, Manittos.manitto_id, Manittos.week).all()
 for manittee, manitto, week in matches:
@@ -32,10 +32,10 @@ for manittee, manitto, week in matches:
     if key not in previous_matches or week > previous_matches[key]:
         previous_matches[key] = week
 
-# ✅ 매칭 결과 저장용
+# 매칭 결과 저장용
 result = []
 
-# ✅ 그룹별 매칭 수행
+# 그룹별 매칭 수행
 for group_id, user_ids in group_users.items():
     matcher = ManittoMatcher(user_ids, previous_matches, current_week)
     pairs, excluded = matcher.assign_weighted_pairs()
