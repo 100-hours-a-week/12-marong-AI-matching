@@ -11,7 +11,6 @@ class ORToolsMatcher:
         current_week: int
     ):
         self.calculator = MatchCostCalculator(previous_matches, current_week)
-        print("이전매칭:", previous_matches)
 
     def solve_route(
         self,

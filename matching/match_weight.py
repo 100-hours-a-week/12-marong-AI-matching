@@ -15,11 +15,11 @@ class MatchCostCalculator:
             weighted_sum = sum((self.current_week - week) * (idx + 1)
                                for idx, week in enumerate(sorted_history))
             cost = weighted_sum * scale
-            print(f"edge_cost {u_from}↔{u_to}: history={history}")
-            print(f"sorted={sorted_history}")
-            print(f"weighted_sum={weighted_sum}, scale={scale} → cost={cost}")
+            # print(f"edge_cost {u_from}↔{u_to}: history={history}")
+            # print(f"sorted={sorted_history}")
+            # print(f"weighted_sum={weighted_sum}, scale={scale} → cost={cost}")
             return cost
         else:
             # 기록 없으면 기본 비용
-            print(f"edge_cost {u_from}↔{u_to}: no history → cost={scale}")
+            # print(f"edge_cost {u_from}↔{u_to}: no history → cost={scale}")
             return scale
