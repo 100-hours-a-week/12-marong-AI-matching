@@ -2,7 +2,7 @@ import random
 from typing import Dict, List, FrozenSet
 from db import SessionLocal
 from db_models import Manittos, UserGroups
-from matching.matcher import ORToolsMatcher
+from matcher import ORToolsMatcher
 from get_week_index import GetWeekIndex
 from datetime import datetime
 

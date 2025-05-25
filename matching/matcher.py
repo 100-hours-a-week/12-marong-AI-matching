@@ -1,7 +1,7 @@
 import random
 from typing import List, Tuple, Dict, FrozenSet
 from ortools.constraint_solver import routing_enums_pb2, pywrapcp
-from matching.match_weight import MatchCostCalculator
+from match_weight import MatchCostCalculator
 
 
 class ORToolsMatcher:
