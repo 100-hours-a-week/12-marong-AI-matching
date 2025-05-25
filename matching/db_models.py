@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
-# ✅ Users
+# Users
 class Users(Base):
     __tablename__ = "Users"
 
@@ -20,11 +20,11 @@ class Users(Base):
     status = Column(String(40), default="active")
     has_completed_survey = Column(Boolean, default=False)
 
-    # 🔗 관계 설정
+    # 관계 설정
     groups = relationship("UserGroups", back_populates="user")
 
 
-# ✅ Groups
+# Groups
 class Groups(Base):
     __tablename__ = "Groups"
 
@@ -34,11 +34,11 @@ class Groups(Base):
     invite_code = Column(String(6), unique=True, nullable=False)
     image_url = Column(Text)
 
-    # 🔗 관계 설정
+    # 관계 설정
     users = relationship("UserGroups", back_populates="group")
 
 
-# ✅ UserGroups
+# UserGroups
 class UserGroups(Base):
     __tablename__ = "UserGroups"
 
@@ -46,7 +46,7 @@ class UserGroups(Base):
     user_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     group_id = Column(BigInteger, ForeignKey("Groups.id", ondelete="CASCADE"), nullable=False)
 
-    # 🔗 관계 매핑
+    # 관계 매핑
     user = relationship("Users", back_populates="groups")
     group = relationship("Groups", back_populates="users")
 
@@ -55,7 +55,7 @@ class UserGroups(Base):
     )
 
 
-# ✅ Manittos
+# Manittos
 class Manittos(Base):
     __tablename__ = "Manittos"
 
