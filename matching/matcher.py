@@ -18,6 +18,9 @@ class ORToolsMatcher:
         start_node: int, # 시작할 사용자 ID
         time_limit: int = 5 # 탐색 시간 제한
     ) -> Tuple[List[Tuple[int, int]], int]:
+        if len(user_ids) <=2:
+            print("매칭을 진행할 수 없습니다")
+            return [], 0
        
 
         # 비용 행렬 생성
