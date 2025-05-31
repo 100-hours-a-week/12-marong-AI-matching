@@ -1,7 +1,7 @@
 import random
 from typing import Dict, List, FrozenSet
 from db import SessionLocal
-from db_models import Manittos, UserGroups
+from db_models import Manittos, UserGroups 
 from matcher import ORToolsMatcher
 from get_week_index import GetWeekIndex
 from datetime import datetime
@@ -22,8 +22,10 @@ user_group_map = {
 }
 
 # group_id -> user_id 목록 매핑
-group_users = {}
-for uid, gid in user_group_map.items():
+group_users: Dict[int, List[int]] = {}
+for record in session.query(UserGroups.user_id, UserGroups.group_id):
+    uid = record.user_id
+    gid = record.group_id
     group_users.setdefault(gid, []).append(uid)
 
 # 과거 매칭 정보 로드
@@ -50,6 +52,9 @@ for group_id, users in group_users.items():
     # 매칭 실행
     start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
     matcher = ORToolsMatcher(previous_matches, current_week)
+    # users_ids = [u.id for u in session.query(Users.id).all()]
+    # print(f"user_ids 개수:  {len(users_ids)}")
+
     route, total_cost = matcher.solve_route(users, start_user)
 
     if not route:
