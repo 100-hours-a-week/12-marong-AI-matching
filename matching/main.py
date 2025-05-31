@@ -1,10 +1,11 @@
 import random
-from typing import Dict, List, FrozenSet
-from db import SessionLocal
-from db_models import Manittos, UserGroups 
-from matcher import ORToolsMatcher
-from get_week_index import GetWeekIndex
+from typing import Dict, List, FrozenSet, Set
+from db.db import SessionLocal
+from db.db_models import Manittos, UserGroups, SurveyHobby
+from core.matcher import ORToolsMatcher
+from core.get_week_index import GetWeekIndex
 from datetime import datetime
+from weight.hobby_weight import HobbyWeight
 
 
 # 날짜 기준 추가 게산
@@ -27,6 +28,14 @@ for record in session.query(UserGroups.user_id, UserGroups.group_id):
     uid = record.user_id
     gid = record.group_id
     group_users.setdefault(gid, []).append(uid)
+
+hobby_weight = HobbyWeight()
+
+user_hobbies: Dict[int, Set[str]] = {}
+for uid, hobby_str in session.query(SurveyHobby.user_id, SurveyHobby.hobby_name).all():
+    parsed_set = hobby_weight.parse_hobby_string(hobby_str)
+    user_hobbies.setdefault(uid, set()).update(parsed_set)
+
 
 # 과거 매칭 정보 로드
 previous_matches: Dict[FrozenSet[int], List[int]] = {}
@@ -51,9 +60,7 @@ for group_id, users in group_users.items():
 
     # 매칭 실행
     start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
-    matcher = ORToolsMatcher(previous_matches, current_week)
-    # users_ids = [u.id for u in session.query(Users.id).all()]
-    # print(f"user_ids 개수:  {len(users_ids)}")
+    matcher = ORToolsMatcher(previous_matches, current_week, user_hobbies)
 
     route, total_cost = matcher.solve_route(users, start_user)
 
@@ -72,7 +79,16 @@ for group_id, users in group_users.items():
             )
         )
         cost_uv = matcher.calculator.edge_cost(u_from, u_to)
-        print(f"[Group {group_id}] {u_from} -> {u_to}, 비용={cost_uv}")
+
+        hobbies_from = user_hobbies.get(u_from, set())
+        hobbies_to = user_hobbies.get(u_to, set())
+        hobbies_from_str = ", ".join(hobbies_from) if hobbies_from else "없음"
+        hobbies_to_str = ", ".join(hobbies_to) if hobbies_to else "없음"
+
+        print(
+            f"[Group {group_id}] {u_from} -> {u_to}, 비용={cost_uv}"
+            f"{u_from} (취미: {hobbies_from_str}) ->"
+            f"{u_to} (취미: {hobbies_to_str})")
 
 # DB 반영 및 세션 종료
 session.commit()

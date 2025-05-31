@@ -22,6 +22,7 @@ class Users(Base):
 
     # 관계 설정
     groups = relationship("UserGroups", back_populates="user")
+    hobbies = relationship("SurveyHobby", back_populates="user", cascade="all, delete-orphan")
 
 
 # Groups
@@ -64,3 +65,23 @@ class Manittos(Base):
     manittee_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     manitto_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     week = Column(Integer, nullable=False)
+
+
+# SurVeyHobby
+class SurveyHobby(Base):
+    __tablename__ = "SurveyHobby"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)       
+    user_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False) 
+    hobby_name = Column(String(100), nullable=False)                                      
+    created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)  
+    updated_at = Column(DateTime, server_default=func.current_timestamp(),
+                        onupdate=func.current_timestamp(), nullable=False) 
+    
+    
+    # 관계 매핑
+    user = relationship("Users", back_populates = "hobbies")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "hobby_name", name = "uq_user_hobby"),
+    )

@@ -15,7 +15,6 @@ class MatchCostCalculator:
             weighted_sum = sum((self.current_week - week)* 5 * (idx + 1)
                                for idx, week in enumerate(sorted_history))
             cost = weighted_sum * scale
-            print(cost)
             return cost
         else:
             return scale
