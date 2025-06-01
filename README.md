@@ -1,5 +1,5 @@
 # 📍 marong-matching
-<img width="600" alt="스크린샷 2025-06-01 오전 5 04 20" src="https://github.com/user-attachments/assets/db61d246-992a-4e7f-95c6-ada4e0915182" />
+<img width="800" alt="스크린샷 2025-06-01 오전 5 04 20" src="https://github.com/user-attachments/assets/db61d246-992a-4e7f-95c6-ada4e0915182" />
 
 
 
