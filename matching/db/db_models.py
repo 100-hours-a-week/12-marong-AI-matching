@@ -23,6 +23,7 @@ class Users(Base):
     # 관계 설정
     groups = relationship("UserGroups", back_populates="user")
     hobbies = relationship("SurveyHobby", back_populates="user", cascade="all, delete-orphan")
+    missions = relationship("UserMissions", back_populates="user", cascade="all, delete-orphan")
 
 
 # Groups
@@ -37,6 +38,7 @@ class Groups(Base):
 
     # 관계 설정
     users = relationship("UserGroups", back_populates="group")
+    missions = relationship("GroupMissions", back_populates="group", cascade="all, delete-orphan")
 
 
 # UserGroups
@@ -84,4 +86,59 @@ class SurveyHobby(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "hobby_name", name = "uq_user_hobby"),
+    )
+
+
+# Missions
+class Missions(Base):
+    __tablename__ = "Missions"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    difficulty = Column(String(20))
+
+    # 관계 매핑
+    group_missions = relationship("GroupMissions", back_populates="mission", cascade="all, delete-orphan")
+    user_missions = relationship("UserMissions", back_populates="missions", cascade="all, delete-orphan")
+
+
+
+# UserMissions
+class UserMissions(Base):
+    __tablename__ = "UserMissions"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
+    group_id = Column(BigInteger, ForeignKey("Groups.id", ondelete="CASCADE"), nullable=False)
+    mission_id = Column(BigInteger, ForeignKey("Missions.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False, default="ing") 
+    week = Column(Integer, nullable=False)
+    assigned_date = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
+
+    # 관계 매핑
+    user = relationship("Users", back_populates="missions")
+    group = relationship("Groups")      
+    missions = relationship("Missions", back_populates="user_missions")
+
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "group_id", "mission_id", "week", name="uq_user_mission_week"),
+    )
+
+
+class GroupMissions(Base):
+    __tablename__ = "GroupMissions"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    group_id = Column(BigInteger, ForeignKey("Groups.id", ondelete="CASCADE"), nullable=False)
+    mission_id = Column(BigInteger, ForeignKey("Missions.id", ondelete="CASCADE"), nullable=False)
+    week = Column(Integer, nullable=False)  
+
+    # 관계 매핑
+    group = relationship("Groups", back_populates="missions")
+    mission = relationship("Missions", back_populates="group_missions")
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "mission_id", "week", name="uq_group_mission_week"),
     )

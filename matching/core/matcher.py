@@ -1,7 +1,8 @@
 from typing import List, Tuple, Dict, FrozenSet, Set
 from ortools.constraint_solver import routing_enums_pb2, pywrapcp
-from weight.match_weight import MatchCostCalculator
+from weight.match_weight import MatchWeight
 from weight.hobby_weight import HobbyWeight
+from weight.mission_weight import MissionWeight
 
 
 class ORToolsMatcher:
@@ -9,11 +10,14 @@ class ORToolsMatcher:
         self,
         previous_matches: Dict[FrozenSet[int], int],
         current_week: int,
-        user_hobbies: Dict[int, Set[str]]
+        user_hobbies: Dict[int, Set[str]],
+        previous_missions: Dict[int, List[int]],
     ):
-        self.calculator = MatchCostCalculator(previous_matches, current_week)
-        self.user_hobbies = user_hobbies
+        self.match_calculator = MatchWeight(previous_matches, current_week)
+        self.mission_calculator = MissionWeight(previous_missions, current_week)
+    
         self.hobby_weight = HobbyWeight()
+        self.user_hobbies = user_hobbies
 
     def solve_route(
         self,
@@ -34,8 +38,14 @@ class ORToolsMatcher:
                 if u == v:
                     cost_matrix[i][j] = 99999 # 정방행렬 방지
                 else:
-                    # 기본 비용
-                    base_cost = self.calculator.edge_cost(u, v)
+                    # 과거 매칭 정보 가중치 계산
+                    match_cost = self.match_calculator.edge_cost(u,v)
+
+                    # 과거 미션 이력 가중치 계산
+                    mission_cost = self.mission_calculator.edge_cost(u,v)
+
+                    # 가중치 합산
+                    base_cost = match_cost + mission_cost
 
                     # 취미 반영
                     hobbies_u = self.user_hobbies.get(u, set())

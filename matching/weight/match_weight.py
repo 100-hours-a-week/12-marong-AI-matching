@@ -1,7 +1,7 @@
 from typing import Dict, FrozenSet
 
 
-class MatchCostCalculator:
+class MatchWeight:
     def __init__(self, previous_matches: Dict[FrozenSet[int], int], current_week: int):
         self.previous_matches = previous_matches 
         self.current_week = current_week 

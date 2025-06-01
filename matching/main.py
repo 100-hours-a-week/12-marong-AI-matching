@@ -1,7 +1,7 @@
 import random
 from typing import Dict, List, FrozenSet, Set
 from db.db import SessionLocal
-from db.db_models import Manittos, UserGroups, SurveyHobby
+from db.db_models import Manittos, UserGroups, SurveyHobby, UserMissions
 from core.matcher import ORToolsMatcher
 from core.get_week_index import GetWeekIndex
 from datetime import datetime
@@ -16,11 +16,11 @@ current_week = GetWeekIndex(today, base_date).get()
 # DB 세션 열기
 session = SessionLocal()
 
-# user_id -> groutp_id 매핑
-user_group_map = {
-    r.user_id: r.group_id
-    for r in session.query(UserGroups.user_id, UserGroups.group_id)
-}
+# # user_id -> groutp_id 매핑
+# user_group_map = {
+#     r.user_id: r.group_id
+#     for r in session.query(UserGroups.user_id, UserGroups.group_id)
+# }
 
 # group_id -> user_id 목록 매핑
 group_users: Dict[int, List[int]] = {}
@@ -46,6 +46,28 @@ for manittee, manitto, week in matches:
         previous_matches.setdefault(key, []).append(week)
 
 
+# 과거 미션 이력 로드
+previous_matches: Dict[FrozenSet[int], List[int]] = {}
+matches = session.query(Manittos.manittee_id, Manittos.manitto_id, Manittos.week).all()
+for manittee, manitto, week in matches:
+    if week < current_week:
+        key = frozenset([manittee, manitto])
+        previous_matches.setdefault(key, []).append(week)
+
+previous_missions: Dict[int, List[int]] = {}
+
+mission_rows = (
+    session.query(UserMissions.user_id, UserMissions.week)
+    .filter(
+        UserMissions.week <= current_week
+    )
+    .all()
+)
+
+for uid, week in mission_rows:
+    previous_missions.setdefault(uid, []).append(week)
+
+
 # 매칭 결과 저장
 result = []
 
@@ -60,7 +82,7 @@ for group_id, users in group_users.items():
 
     # 매칭 실행
     start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
-    matcher = ORToolsMatcher(previous_matches, current_week, user_hobbies)
+    matcher = ORToolsMatcher(previous_matches, current_week, user_hobbies, previous_missions)
 
     route, total_cost = matcher.solve_route(users, start_user)
 
@@ -78,7 +100,10 @@ for group_id, users in group_users.items():
                 week=current_week
             )
         )
-        cost_uv = matcher.calculator.edge_cost(u_from, u_to)
+
+        match_cost = matcher.match_calculator.edge_cost(u_from, u_to)
+        mission_cost = matcher.mission_calculator.edge_cost(u_from, u_to)
+        combined_cost = match_cost + mission_cost
 
         hobbies_from = user_hobbies.get(u_from, set())
         hobbies_to = user_hobbies.get(u_to, set())
@@ -86,7 +111,8 @@ for group_id, users in group_users.items():
         hobbies_to_str = ", ".join(hobbies_to) if hobbies_to else "없음"
 
         print(
-            f"[Group {group_id}] {u_from} -> {u_to}, 비용={cost_uv}"
+            f"[Group {group_id}] {u_from} -> {u_to},"
+            f"과거매칭비용={match_cost}, 미션비용={mission_cost}, 합산비용={combined_cost}"
             f"{u_from} (취미: {hobbies_from_str}) ->"
             f"{u_to} (취미: {hobbies_to_str})")
 
