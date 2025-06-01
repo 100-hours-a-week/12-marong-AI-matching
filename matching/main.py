@@ -1,11 +1,12 @@
 import random
 from typing import Dict, List, FrozenSet, Set
 from db.db import SessionLocal
-from db.db_models import Manittos, UserGroups, SurveyHobby, UserMissions
+from db.db_models import Manittos, UserGroups, SurveyHobby, UserMissions, SurveyMBTI
 from core.matcher import ORToolsMatcher
 from core.get_week_index import GetWeekIndex
 from datetime import datetime
 from weight.hobby_weight import HobbyWeight
+from weight.mbti_weight import MBTIWeight 
 
 
 # 날짜 기준 추가 게산
@@ -16,12 +17,6 @@ current_week = GetWeekIndex(today, base_date).get()
 # DB 세션 열기
 session = SessionLocal()
 
-# # user_id -> groutp_id 매핑
-# user_group_map = {
-#     r.user_id: r.group_id
-#     for r in session.query(UserGroups.user_id, UserGroups.group_id)
-# }
-
 # group_id -> user_id 목록 매핑
 group_users: Dict[int, List[int]] = {}
 for record in session.query(UserGroups.user_id, UserGroups.group_id):
@@ -29,12 +24,17 @@ for record in session.query(UserGroups.user_id, UserGroups.group_id):
     gid = record.group_id
     group_users.setdefault(gid, []).append(uid)
 
+# 사용자별 취미 로드
 hobby_weight = HobbyWeight()
-
 user_hobbies: Dict[int, Set[str]] = {}
 for uid, hobby_str in session.query(SurveyHobby.user_id, SurveyHobby.hobby_name).all():
     parsed_set = hobby_weight.parse_hobby_string(hobby_str)
     user_hobbies.setdefault(uid, set()).update(parsed_set)
+
+# 사용자별 MBTI 로드
+user_mbti: Dict[int, str] = {}
+for uid, mbti_str in session.query(SurveyMBTI.user_id, SurveyMBTI.mbti).all():
+    user_mbti[uid] = mbti_str.strip().upper()
 
 
 # 과거 매칭 정보 로드
@@ -82,13 +82,17 @@ for group_id, users in group_users.items():
 
     # 매칭 실행
     start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
-    matcher = ORToolsMatcher(previous_matches, current_week, user_hobbies, previous_missions)
+    matcher = ORToolsMatcher(previous_matches, current_week, user_hobbies, previous_missions, user_mbti)
 
-    route, total_cost = matcher.solve_route(users, start_user)
+    route, total_cost = matcher.solve_route(users, start_user, group_id)
 
     if not route:
         print(f"[Group {group_id}] 매칭 실패: 유효한 경로를 찾을 수 없습니다.")
         continue
+
+    print(f"[Group {group_id}] 최종 매칭 결과 (총 비용 = {total_cost}):")
+    for u_from, u_to in route:
+        print(f"{u_from} -> {u_to}")
 
     # 결과 DB 저장 및 출력
     for u_from, u_to in route:
@@ -100,21 +104,6 @@ for group_id, users in group_users.items():
                 week=current_week
             )
         )
-
-        match_cost = matcher.match_calculator.edge_cost(u_from, u_to)
-        mission_cost = matcher.mission_calculator.edge_cost(u_from, u_to)
-        combined_cost = match_cost + mission_cost
-
-        hobbies_from = user_hobbies.get(u_from, set())
-        hobbies_to = user_hobbies.get(u_to, set())
-        hobbies_from_str = ", ".join(hobbies_from) if hobbies_from else "없음"
-        hobbies_to_str = ", ".join(hobbies_to) if hobbies_to else "없음"
-
-        print(
-            f"[Group {group_id}] {u_from} -> {u_to},"
-            f"과거매칭비용={match_cost}, 미션비용={mission_cost}, 합산비용={combined_cost}"
-            f"{u_from} (취미: {hobbies_from_str}) ->"
-            f"{u_to} (취미: {hobbies_to_str})")
 
 # DB 반영 및 세션 종료
 session.commit()

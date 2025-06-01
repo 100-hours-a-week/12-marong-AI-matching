@@ -18,6 +18,9 @@ class HobbyWeight:
         hobbies_v: Set[str]
     ) -> int:
         
-        if hobbies_u & hobbies_v:
-            return int(base_cost * self.discount_rate)
+        common_count = len(hobbies_u & hobbies_v)
+
+        if common_count > 0:
+            discount_factor = self.discount_rate ** common_count
+            return int(base_cost * discount_factor)
         return base_cost

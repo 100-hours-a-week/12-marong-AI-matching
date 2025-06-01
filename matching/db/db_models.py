@@ -24,6 +24,7 @@ class Users(Base):
     groups = relationship("UserGroups", back_populates="user")
     hobbies = relationship("SurveyHobby", back_populates="user", cascade="all, delete-orphan")
     missions = relationship("UserMissions", back_populates="user", cascade="all, delete-orphan")
+    mbti_records = relationship("SurveyMBTI", back_populates="user", cascade="all, delete-orphan")
 
 
 # Groups
@@ -87,6 +88,28 @@ class SurveyHobby(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "hobby_name", name = "uq_user_hobby"),
     )
+
+
+# SurveyMBTI
+class SurveyMBTI(Base):
+    __tablename__ = "SurveyMBTI"
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
+
+    # MBTI 축별 점수 (0~100 사이, 5단위로 저장되는 것으로 가정)
+    ei_score = Column(Integer, nullable=False)
+    sn_score = Column(Integer, nullable=False)
+    tf_score = Column(Integer, nullable=False)
+    jp_score = Column(Integer, nullable=False)
+
+    mbti = Column(String(4), nullable=False)
+    created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.current_timestamp(),
+                        onupdate=func.current_timestamp(), nullable=False)
+
+    # 관계 매핑
+    user = relationship("Users", back_populates="mbti_records")
+
 
 
 # Missions

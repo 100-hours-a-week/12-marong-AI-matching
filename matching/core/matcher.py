@@ -3,6 +3,7 @@ from ortools.constraint_solver import routing_enums_pb2, pywrapcp
 from weight.match_weight import MatchWeight
 from weight.hobby_weight import HobbyWeight
 from weight.mission_weight import MissionWeight
+from weight.mbti_weight import MBTIWeight
 
 
 class ORToolsMatcher:
@@ -12,18 +13,23 @@ class ORToolsMatcher:
         current_week: int,
         user_hobbies: Dict[int, Set[str]],
         previous_missions: Dict[int, List[int]],
+        user_mbti: Dict[int, str],
     ):
         self.match_calculator = MatchWeight(previous_matches, current_week)
         self.mission_calculator = MissionWeight(previous_missions, current_week)
     
         self.hobby_weight = HobbyWeight()
+        self.mbti_weight = MBTIWeight()
+
         self.user_hobbies = user_hobbies
+        self.user_mbti = user_mbti
 
     def solve_route(
         self,
         user_ids: List[int],  # 실제 사용자 ID 리스트
         start_node: int, # 시작할 사용자 ID
-        time_limit: int = 5 # 탐색 시간 제한
+        group_id: int,
+        time_limit: int = 10 # 탐색 시간 제한
     ) -> Tuple[List[Tuple[int, int]], int]:
         if len(user_ids) <=2:
             print("매칭을 진행할 수 없습니다")
@@ -50,9 +56,30 @@ class ORToolsMatcher:
                     # 취미 반영
                     hobbies_u = self.user_hobbies.get(u, set())
                     hobbies_v = self.user_hobbies.get(v, set())
-                    cost_matrix[i][j] = self.hobby_weight.apply_discount(
-                        base_cost, hobbies_u, hobbies_v
+                    discounted_cost = self.hobby_weight.apply_discount(base_cost, hobbies_u, hobbies_v)
+
+                    # MBTI 반영
+                    mbti_cost = 0
+                    mbti_u = self.user_mbti.get(u)
+                    mbti_v = self.user_mbti.get(v)
+                    if mbti_u and mbti_v:
+                        mbti_cost = self.mbti_weight.get_cost(mbti_u, mbti_v)
+
+                    # 최종 비용
+                    final_cost = discounted_cost + mbti_cost
+                    cost_matrix[i][j] = final_cost
+
+                    hobbies_u_str = ", ".join(hobbies_u) if hobbies_u else "없음"
+                    hobbies_v_str = ", ".join(hobbies_v) if hobbies_v else "없음"
+                    print(
+                        f"[Group {group_id}] {u} -> {v}, "
+                        f"| 과거매칭비용={match_cost} "
+                        f"| 미션비용={mission_cost} "
+                        f"| 취미비용={discounted_cost}, {u} (취미: {hobbies_u_str}) -> {v} (취미: {hobbies_v_str}) "
+                        f"| MBTI비용={mbti_cost} "
+                        f"| 최종비용={final_cost} "
                     )
+                
 
 
         start_index = user_ids.index(start_node)
