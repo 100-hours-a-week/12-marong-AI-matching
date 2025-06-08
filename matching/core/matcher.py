@@ -1,0 +1,127 @@
+from typing import List, Tuple, Dict, FrozenSet, Set
+from ortools.constraint_solver import routing_enums_pb2, pywrapcp
+from weight.match_weight import MatchWeight
+from weight.hobby_weight import HobbyWeight
+from weight.mission_weight import MissionWeight
+from weight.mbti_weight import MBTIWeight
+
+
+class ORToolsMatcher:
+    def __init__(
+        self,
+        previous_matches: Dict[FrozenSet[int], int],
+        current_week: int,
+        user_hobbies: Dict[int, Set[str]],
+        previous_missions: Dict[int, List[int]],
+        user_mbti: Dict[int, str],
+    ):
+        self.match_calculator = MatchWeight(previous_matches, current_week)
+        self.mission_calculator = MissionWeight(previous_missions, current_week)
+    
+        self.hobby_weight = HobbyWeight()
+        self.mbti_weight = MBTIWeight()
+
+        self.user_hobbies = user_hobbies
+        self.user_mbti = user_mbti
+
+    def solve_route(
+        self,
+        user_ids: List[int],  # 실제 사용자 ID 리스트
+        start_node: int, # 시작할 사용자 ID
+        group_id: int,
+        time_limit: int = 10 # 탐색 시간 제한
+    ) -> Tuple[List[Tuple[int, int]], int]:
+        if len(user_ids) <=2:
+            print("매칭을 진행할 수 없습니다")
+            return [], 0
+       
+
+        # 비용 행렬 생성
+        N = len(user_ids)
+        cost_matrix = [[0] * N for _ in range(N)]
+        for i, u in enumerate(user_ids):
+            for j, v in enumerate(user_ids):
+                if u == v:
+                    cost_matrix[i][j] = 99999 # 정방행렬 방지
+                else:
+                    # 과거 매칭 정보 가중치 계산
+                    match_cost = self.match_calculator.edge_cost(u,v)
+
+                    # 과거 미션 이력 가중치 계산
+                    mission_cost = self.mission_calculator.edge_cost(u,v)
+
+                    # 가중치 합산
+                    base_cost = match_cost + mission_cost
+
+                    # 취미 반영
+                    hobbies_u = self.user_hobbies.get(u, set())
+                    hobbies_v = self.user_hobbies.get(v, set())
+                    discounted_cost = self.hobby_weight.apply_discount(base_cost, hobbies_u, hobbies_v)
+
+                    # MBTI 반영
+                    mbti_cost = 0
+                    mbti_u = self.user_mbti.get(u)
+                    mbti_v = self.user_mbti.get(v)
+                    if mbti_u and mbti_v:
+                        mbti_cost = self.mbti_weight.get_cost(mbti_u, mbti_v)
+
+                    # 최종 비용
+                    final_cost = discounted_cost + mbti_cost
+                    cost_matrix[i][j] = final_cost
+
+                    hobbies_u_str = ", ".join(hobbies_u) if hobbies_u else "없음"
+                    hobbies_v_str = ", ".join(hobbies_v) if hobbies_v else "없음"
+                    print(
+                        f"[Group {group_id}] {u} -> {v}, "
+                        f"| 과거매칭비용={match_cost} "
+                        f"| 미션비용={mission_cost} "
+                        f"| 취미비용={discounted_cost}, {u} (취미: {hobbies_u_str}) -> {v} (취미: {hobbies_v_str}) "
+                        f"| MBTI비용={mbti_cost} "
+                        f"| 최종비용={final_cost} "
+                    )
+                
+
+
+        start_index = user_ids.index(start_node)
+        manager = pywrapcp.RoutingIndexManager(N, 1, start_index)
+        routing = pywrapcp.RoutingModel(manager)
+
+        # 비용 콜백
+        def cost_callback(from_index, to_index):
+            from_node = manager.IndexToNode(from_index)
+            to_node = manager.IndexToNode(to_index)
+            return cost_matrix[from_node][to_node]
+
+        transit_index = routing.RegisterTransitCallback(cost_callback)
+        routing.SetArcCostEvaluatorOfAllVehicles(transit_index)
+
+        # 탐색 파라미터 설정
+        search_params = pywrapcp.DefaultRoutingSearchParameters()
+        search_params.first_solution_strategy = (
+            routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+        )
+        search_params.local_search_metaheuristic = (
+            routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+        )
+        search_params.time_limit.seconds = time_limit
+        search_params.log_search = False
+
+        # 최적화 실행
+        solution = routing.SolveWithParameters(search_params)
+        if not solution:
+            return [], 0
+
+        # 결과 추출
+        index = routing.Start(0)
+        route: List[Tuple[int, int]] = []
+        total_cost = 0
+        while not routing.IsEnd(index):
+            from_idx = manager.IndexToNode(index)
+            next_idx = solution.Value(routing.NextVar(index))
+            to_idx = manager.IndexToNode(next_idx)
+
+            route.append((user_ids[from_idx], user_ids[to_idx]))
+            total_cost += routing.GetArcCostForVehicle(index, next_idx, 0)
+            index = next_idx
+
+        return route, total_cost
