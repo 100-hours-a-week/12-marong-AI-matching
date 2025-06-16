@@ -7,7 +7,7 @@ class MatchWeight:
         self.current_week = current_week 
 
     # 가중치 계산
-    def edge_cost(self, u_from: int, u_to: int, scale: int =50) -> int:
+    def edge_cost(self, u_from: int, u_to: int, scale: int =1000) -> int:
         key = frozenset([u_from, u_to])
         history = self.previous_matches.get(key, [])
         if history:
