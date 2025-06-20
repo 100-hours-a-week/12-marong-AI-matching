@@ -6,7 +6,8 @@ from core.matcher import ORToolsMatcher
 from core.get_week_index import GetWeekIndex
 from datetime import datetime
 from weight.hobby_weight import HobbyWeight
-from weight.mbti_weight import MBTIWeight 
+from weight.mbti_weight import MBTIWeight
+from db.chromadb_client import get_chroma_client, get_user_latest_collection
 
 
 # 날짜 기준 추가 게산
@@ -31,10 +32,38 @@ for uid, hobby_str in session.query(SurveyHobby.user_id, SurveyHobby.hobby_name)
     parsed_set = hobby_weight.parse_hobby_string(hobby_str)
     user_hobbies.setdefault(uid, set()).update(parsed_set)
 
+# ChromaDB에서 MBTI 로드
+get_chroma_client()
+user_latest_col = get_user_latest_collection()
+
 # 사용자별 MBTI 로드
 user_mbti: Dict[int, str] = {}
-for uid, mbti_str in session.query(SurveyMBTI.user_id, SurveyMBTI.mbti).all():
-    user_mbti[uid] = mbti_str.strip().upper()
+user_ids = [r.user_id for r in session.query(UserGroups.user_id).distinct()]
+
+for uid in user_ids:
+    rec = user_latest_col.get(where={"user_id": int(uid)}, limit=1, include=["metadatas"])
+    if rec.get("ids"):
+        meta = rec["metadatas"][0]
+        ei, sn, tf, jp = meta["ei_score"], meta["sn_score"], meta["tf_score"], meta["jp_score"]
+    else:
+        row = (
+            session.query(SurveyMBTI.ei_score, SurveyMBTI.sn_score,
+                          SurveyMBTI.tf_score, SurveyMBTI.jp_score)
+            .filter(SurveyMBTI.user_id == uid)
+            .order_by(SurveyMBTI.created_at.desc())
+            .first()
+        )
+        if not row:
+            continue
+        ei, sn, tf, jp = row.ei_score, row.sn_score, row.tf_score, row.jp_score
+
+    mbti = (
+        ("E" if ei >= 50 else "I") +
+        ("N" if sn >= 50 else "S") +
+        ("F" if tf >= 50 else "T") +
+        ("P" if jp >= 50 else "J")
+    )
+    user_mbti[uid] = mbti
 
 
 # 과거 매칭 정보 로드
