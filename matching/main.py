@@ -6,7 +6,8 @@ from core.matcher import ORToolsMatcher
 from core.get_week_index import GetWeekIndex
 from datetime import datetime
 from weight.hobby_weight import HobbyWeight
-from weight.mbti_weight import MBTIWeight 
+from weight.mbti_weight import MBTIWeight
+from db.chromadb_client import get_chroma_client, get_user_latest_collection
 
 
 # 날짜 기준 추가 게산
@@ -31,10 +32,38 @@ for uid, hobby_str in session.query(SurveyHobby.user_id, SurveyHobby.hobby_name)
     parsed_set = hobby_weight.parse_hobby_string(hobby_str)
     user_hobbies.setdefault(uid, set()).update(parsed_set)
 
+# ChromaDB에서 MBTI 로드
+get_chroma_client()
+user_latest_col = get_user_latest_collection()
+
 # 사용자별 MBTI 로드
 user_mbti: Dict[int, str] = {}
-for uid, mbti_str in session.query(SurveyMBTI.user_id, SurveyMBTI.mbti).all():
-    user_mbti[uid] = mbti_str.strip().upper()
+user_ids = [r.user_id for r in session.query(UserGroups.user_id).distinct()]
+
+for uid in user_ids:
+    rec = user_latest_col.get(where={"user_id": int(uid)}, limit=1, include=["metadatas"])
+    if rec.get("ids"):
+        meta = rec["metadatas"][0]
+        ei, sn, tf, jp = meta["ei_score"], meta["sn_score"], meta["tf_score"], meta["jp_score"]
+    else:
+        row = (
+            session.query(SurveyMBTI.ei_score, SurveyMBTI.sn_score,
+                          SurveyMBTI.tf_score, SurveyMBTI.jp_score)
+            .filter(SurveyMBTI.user_id == uid)
+            .order_by(SurveyMBTI.created_at.desc())
+            .first()
+        )
+        if not row:
+            continue
+        ei, sn, tf, jp = row.ei_score, row.sn_score, row.tf_score, row.jp_score
+
+    mbti = (
+        ("E" if ei >= 50 else "I") +
+        ("N" if sn >= 50 else "S") +
+        ("F" if tf >= 50 else "T") +
+        ("P" if jp >= 50 else "J")
+    )
+    user_mbti[uid] = mbti
 
 
 # 과거 매칭 정보 로드
@@ -73,12 +102,21 @@ result = []
 
 # 그룹별 매칭 수행
 for group_id, users in group_users.items():
-    # 과거 매칭 기반 비용 행렬 생성
-    N = len(users)
-    cost_matrix = [
-        [99999 if i == j else random.randint(1, 100) for j in range(N)]
-        for i in range(N)
-    ]
+    # 해당 주차에 이미 매칭된 유저 조회
+    matched_user_ids = set(
+        uid for uid, in session.query(Manittos.manittee_id)
+        .filter(Manittos.group_id == group_id, Manittos.week == current_week)
+        .all()
+    )
+
+    # 매칭 대상 유저 필터링
+    valid_users = [uid for uid in users if uid not in matched_user_ids]
+
+    if len(valid_users) < 2:
+        print(f"[Group {group_id}] 매칭할 수 있는 유저가 부족합니다.")
+        continue
+
+
 
     # 매칭 실행
     start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
