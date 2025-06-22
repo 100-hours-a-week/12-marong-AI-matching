@@ -66,25 +66,16 @@ for uid in user_ids:
     user_mbti[uid] = mbti
 
 
-# 과거 매칭 정보 로드
+# 과거 매칭 이력 로드
 previous_matches: Dict[FrozenSet[int], List[int]] = {}
 matches = session.query(Manittos.manittee_id, Manittos.manitto_id, Manittos.week).all()
 for manittee, manitto, week in matches:
     if week < current_week:
         key = frozenset([manittee, manitto])
         previous_matches.setdefault(key, []).append(week)
-
 
 # 과거 미션 이력 로드
-previous_matches: Dict[FrozenSet[int], List[int]] = {}
-matches = session.query(Manittos.manittee_id, Manittos.manitto_id, Manittos.week).all()
-for manittee, manitto, week in matches:
-    if week < current_week:
-        key = frozenset([manittee, manitto])
-        previous_matches.setdefault(key, []).append(week)
-
 previous_missions: Dict[int, List[int]] = {}
-
 mission_rows = (
     session.query(UserMissions.user_id, UserMissions.week)
     .filter(
@@ -117,12 +108,11 @@ for group_id, users in group_users.items():
         continue
 
 
-
     # 매칭 실행
-    start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
+    start_user = valid_users[0]  # 시작 노드를 첫 번째 사용자로 고정
     matcher = ORToolsMatcher(previous_matches, current_week, user_hobbies, previous_missions, user_mbti)
 
-    route, total_cost = matcher.solve_route(users, start_user, group_id)
+    route, total_cost = matcher.solve_route(valid_users, start_user, group_id)
 
     if not route:
         print(f"[Group {group_id}] 매칭 실패: 유효한 경로를 찾을 수 없습니다.")
