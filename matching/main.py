@@ -102,12 +102,21 @@ result = []
 
 # 그룹별 매칭 수행
 for group_id, users in group_users.items():
-    # 과거 매칭 기반 비용 행렬 생성
-    N = len(users)
-    cost_matrix = [
-        [99999 if i == j else random.randint(1, 100) for j in range(N)]
-        for i in range(N)
-    ]
+    # 해당 주차에 이미 매칭된 유저 조회
+    matched_user_ids = set(
+        uid for uid, in session.query(Manittos.manittee_id)
+        .filter(Manittos.group_id == group_id, Manittos.week == current_week)
+        .all()
+    )
+
+    # 매칭 대상 유저 필터링
+    valid_users = [uid for uid in users if uid not in matched_user_ids]
+
+    if len(valid_users) < 2:
+        print(f"[Group {group_id}] 매칭할 수 있는 유저가 부족합니다.")
+        continue
+
+
 
     # 매칭 실행
     start_user = users[0]  # 시작 노드를 첫 번째 사용자로 고정
