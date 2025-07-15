@@ -1,14 +1,12 @@
 import random
 from typing import Dict, List, FrozenSet, Set
 from db.db import SessionLocal
-from db.db_models import Manittos, UserGroups, SurveyHobby, UserMissions, SurveyMBTI
+from db.db_models import Manittos, UserGroups, SurveyHobby, UserMissions, SurveyMBTI, MBTIUpdates
 from core.matcher import ORToolsMatcher
 from core.get_week_index import GetWeekIndex
 from datetime import datetime
 from weight.hobby_weight import HobbyWeight
 from weight.mbti_weight import MBTIWeight
-from db.chromadb_client import get_chroma_client, get_user_latest_collection
-
 
 # 날짜 기준 추가 게산
 base_date = datetime(2025, 1, 6)
@@ -32,19 +30,21 @@ for uid, hobby_str in session.query(SurveyHobby.user_id, SurveyHobby.hobby_name)
     parsed_set = hobby_weight.parse_hobby_string(hobby_str)
     user_hobbies.setdefault(uid, set()).update(parsed_set)
 
-# ChromaDB에서 MBTI 로드
-get_chroma_client()
-user_latest_col = get_user_latest_collection()
 
 # 사용자별 MBTI 로드
 user_mbti: Dict[int, str] = {}
 user_ids = [r.user_id for r in session.query(UserGroups.user_id).distinct()]
 
 for uid in user_ids:
-    rec = user_latest_col.get(where={"user_id": int(uid)}, limit=1, include=["metadatas"])
-    if rec.get("ids"):
-        meta = rec["metadatas"][0]
-        ei, sn, tf, jp = meta["ei_score"], meta["sn_score"], meta["tf_score"], meta["jp_score"]
+    update_row = (
+        session.query(MBTIUpdates.ei_score, MBTIUpdates.sn_score, MBTIUpdates.tf_score, MBTIUpdates.jp_score)
+        .filter(MBTIUpdates.user_id == uid)
+        .order_by(MBTIUpdates.created_at.desc())
+        .first()
+    )
+    if update_row:
+        ei, sn, tf, jp = update_row.ei_score, update_row.sn_score, update_row.tf_score, update_row.jp_score
+
     else:
         row = (
             session.query(SurveyMBTI.ei_score, SurveyMBTI.sn_score,
