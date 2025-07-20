@@ -25,6 +25,7 @@ class Users(Base):
     hobbies = relationship("SurveyHobby", back_populates="user", cascade="all, delete-orphan")
     missions = relationship("UserMissions", back_populates="user", cascade="all, delete-orphan")
     mbti_records = relationship("SurveyMBTI", back_populates="user", cascade="all, delete-orphan")
+    mbti_updates = relationship("MBTIUpdates", back_populates="user", cascade="all, delete-orphan")
 
 
 # Groups
@@ -165,3 +166,25 @@ class GroupMissions(Base):
     __table_args__ = (
         UniqueConstraint("group_id", "mission_id", "week", name="uq_group_mission_week"),
     )
+
+
+class MBTIUpdates(Base):
+    __tablename__ = "MBTIUpdates"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(BigInteger, nullable=True)  
+
+    ei_score = Column(Integer, nullable=False)
+    sn_score = Column(Integer, nullable=False)
+    tf_score = Column(Integer, nullable=False)
+    jp_score = Column(Integer, nullable=False)
+
+    previous_score = Column(String(4), nullable=False)
+    changed_mbti_type = Column(String(4), nullable=False)
+    change_reason = Column(Text, nullable=True)
+    current_score = Column(String(4), nullable=False)
+
+    created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
+
+    user = relationship("Users")
